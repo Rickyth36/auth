@@ -3,9 +3,9 @@ import cors from 'cors';
 import 'dotenv/config';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
-import { connect } from 'mongoose';
 import connectDB from './config/mongo.js';
 import authRouter from './routes/authRoutes.js';
+import userRouter from './routes/userRoutes.js';
 
 const app = express();
 const port = process.env.PORT || 5001
@@ -19,7 +19,8 @@ app.use(cors({credentials : true}));
 app.get('/',(req,res) => {
     res.send('Api working');
 })
-app.use('/api/auth',authRouter)
+app.use('/api/auth',authRouter);
+app.use('/api/user',userRouter);
 
 
 app.listen(port, () => {
