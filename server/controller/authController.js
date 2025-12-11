@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import userModel from '../models/userModel.js';
 import transporter from '../config/nodemailer.js';
-
+import {EMAIL_VERIFY_TEMPLATE, PASSWORD_RESET_TEMPLATE} from '../config/emailTemplates.js';
 export const register  = async(req,res) => {
     const {name, email, password} = req.body;
     if(!name || !email || !password) {
@@ -46,7 +46,7 @@ export const register  = async(req,res) => {
 
 
 export const login = async(req, res) => {
-     const { email,password } = req.body;
+     const { email, password } = req.body;
      if( !email || !password ) {
         return res.json({success: false, message: 'Email and password are required'});
      }
@@ -60,6 +60,18 @@ export const login = async(req, res) => {
         if(!isMatch){
             return res.json({success: false, message: 'Invalid password'});
         }
+
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+            expiresIn: '7d'
+        });
+
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: false,  // keep false on localhost
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
+
         return res.json({
             success: true,
             message: 'Logged in successfully',
@@ -91,7 +103,6 @@ export const logout = async(req,res) => {
 // Send vertification otp to user's email
 export const sendVerifyOtp = async (req, res) => {
     try {
-        console.log('req',req.userId);
         const userId = req.userId;
 
         const user = await userModel.findById(userId);
@@ -108,7 +119,8 @@ export const sendVerifyOtp = async (req, res) => {
             from: process.env.SENDER_EMAIL,
             to: user.email,
             subject: 'Account verification OTP',
-            text: `Your OTP is ${otp}. Verify your account using this OTP`
+            // text: `Your OTP is ${otp}. Verify your account using this OTP`
+            html: EMAIL_VERIFY_TEMPLATE.replace("{{otp}}",otp).replace("{{email}}",user.email)        
         });
 
         res.json({ success: true, message: 'Verification OTP sent on Email' });
@@ -121,7 +133,6 @@ export const sendVerifyOtp = async (req, res) => {
 export const verifyEmail = async(req,res) => {
     const userId = req.userId;
     const {otp} = req.body;
-    console.log(userId, otp);
     if(!userId || !otp) { 
         return res.json({success: false,message: 'Missing details '});
     }
@@ -158,7 +169,6 @@ export const isAuthenticated = async(req, res) => {
 // Send password reset OTP
 export const sendResetOTP = async(req,res) => {
     const {email} = req.body;
-    console.log('email',email);
     if(!email){
         return res.json({success: false,message:'Email is required'});
     }
@@ -176,8 +186,9 @@ export const sendResetOTP = async(req,res) => {
             from: process.env.SENDER_EMAIL,
             to: email,
             subject: 'Password Reset Email',
-            text: `Your OTP for resetting your password is ${otp}.
-            Use this OTP to proceed with resetting your password`
+            // text: `Your OTP for resetting your password is ${otp}.
+            // Use this OTP to proceed with resetting your password`
+            html: PASSWORD_RESET_TEMPLATE.replace("{{otp}}",otp).replace("{{email}}",user.email)
         };
         await transporter.sendMail(mailOptions);
         return res.json({success: true, message:'OTP sent to your email'});
